@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/screens/welcome_screen.dart';
 import '../../features/auth/screens/registration_screen.dart';
+import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/otp_screen.dart';
 import '../../features/chat/screens/chats_list_screen.dart';
 import '../../features/chat/screens/contacts_screen.dart';
 import '../../features/chat/screens/chat_screen.dart';
 import '../../features/camera/screens/camera_screen.dart';
+import '../../features/camera/screens/video_call_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/settings/screens/profile_screen.dart';
 import '../../features/settings/screens/account_screen.dart';
@@ -30,7 +32,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
 
       final isAuthRoute =
-          loc == '/welcome' || loc == '/register' || loc == '/otp';
+          loc == '/welcome' || loc == '/register' || loc == '/otp' || loc == '/login';
 
       // Not logged in → must be on auth route
       if (!isLoggedIn && !isAuthRoute) {
@@ -53,6 +55,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegistrationScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
         path: '/otp',
@@ -81,6 +87,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/camera',
         builder: (context, state) => const CameraScreen(),
+      ),
+      GoRoute(
+        path: '/video-call/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return VideoCallScreen(otherUserId: id);
+        },
       ),
 
       // ── Settings ──────────────────────────────────────

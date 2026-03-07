@@ -8,7 +8,7 @@ class ContactsHelper {
   static Future<bool> requestPermission() async {
     if (kIsWeb) return false;
     try {
-      return await FlutterContacts.requestPermission();
+      return await FlutterContacts.requestPermission(readonly: true);
     } catch (e) {
       debugPrint('❌ [CONTACTS] Permission request failed: $e');
       return false;

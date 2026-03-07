@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/utils.dart';
 import '../providers/chat_provider.dart';
@@ -20,6 +22,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final String _currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  bool _isTyping = false;
 
   @override
   void initState() {
@@ -45,9 +48,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     _msgController.clear();
+    // Clear typing status when message is sent
+    ref.read(chatServiceProvider).setTypingStatus(widget.chatId, false);
     setState(() {});
 
-    // Scroll to bottom
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -59,8 +67,115 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
+  Future<void> _pickAndSendImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 70,
+      maxWidth: 1024,
+    );
+    if (picked == null) return;
+
+    final imageFile = File(picked.path);
+    final otherUser = ref.read(userDataProvider(widget.chatId));
+    otherUser.whenData((user) {
+      ref.read(chatServiceProvider).sendImageMessage(
+            receiverId: widget.chatId,
+            receiverName: user.name,
+            receiverProfilePic: user.profilePic,
+            imageFile: imageFile,
+          );
+    });
+
+    _scrollToBottom();
+  }
+
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.warmGray,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Send Image',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _imageOption(
+                    icon: Icons.camera_alt_rounded,
+                    label: 'Camera',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _pickAndSendImage(ImageSource.camera);
+                    },
+                  ),
+                  _imageOption(
+                    icon: Icons.photo_library_rounded,
+                    label: 'Gallery',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _pickAndSendImage(ImageSource.gallery);
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _imageOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.mediumBrown, width: 1.5),
+            ),
+            child: Icon(icon, color: AppColors.mediumBrown, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 13, color: AppColors.mediumBrown)),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    // Clear typing status on leaving
+    ref.read(chatServiceProvider).setTypingStatus(widget.chatId, false);
     _msgController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -71,6 +186,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final messagesAsync = ref.watch(chatMessagesProvider(widget.chatId));
     final userAsync = ref.watch(userDataProvider(widget.chatId));
+    final isOtherTyping =
+        ref.watch(typingStatusProvider(widget.chatId)).valueOrNull ?? false;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkChatBg : AppColors.lightChatBg,
@@ -102,15 +219,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      user.isOnline
-                          ? 'online'
-                          : 'last seen ${formatChatTime(user.lastSeen)}',
+                      isOtherTyping
+                          ? 'typing...'
+                          : user.isOnline
+                              ? 'online'
+                              : 'last seen ${formatChatTime(user.lastSeen)}',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.normal,
-                        color: user.isOnline
+                        color: isOtherTyping
                             ? AppColors.online
-                            : AppColors.warmGray,
+                            : user.isOnline
+                                ? AppColors.online
+                                : AppColors.warmGray,
                       ),
                     ),
                   ],
@@ -124,11 +245,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.videocam_rounded),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.call_rounded),
-            onPressed: () {},
+            onPressed: () {
+              context.push('/video-call/${widget.chatId}');
+            },
           ),
           IconButton(
             icon: const Icon(Icons.more_vert_rounded),
@@ -241,7 +360,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
                         ),
-                        onChanged: (_) => setState(() {}),
+                        onChanged: (_) {
+                          final wasTyping = _isTyping;
+                          _isTyping = _msgController.text.isNotEmpty;
+                          if (_isTyping != wasTyping) {
+                            ref
+                                .read(chatServiceProvider)
+                                .setTypingStatus(widget.chatId, _isTyping);
+                          }
+                          setState(() {});
+                        },
                       ),
                     ),
                     IconButton(
@@ -257,7 +385,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           Icons.camera_alt_rounded,
                           color: isDark ? AppColors.warmGray : AppColors.tan,
                         ),
-                        onPressed: () => context.push('/camera'),
+                        onPressed: _showImagePickerOptions,
                       ),
                   ],
                 ),
@@ -272,13 +400,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: IconButton(
                 icon: Icon(
                   _msgController.text.isEmpty
-                      ? Icons.mic_rounded
+                      ? Icons.sign_language_rounded
                       : Icons.send_rounded,
                   color: Colors.white,
                 ),
                 onPressed: () {
                   if (_msgController.text.isNotEmpty) {
                     _sendMessage();
+                  } else {
+                    // Open sign language detection camera
+                    context.push('/camera');
                   }
                 },
               ),

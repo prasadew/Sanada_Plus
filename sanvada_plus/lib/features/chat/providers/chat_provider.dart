@@ -23,3 +23,9 @@ final userDataProvider =
     StreamProvider.family<UserModel, String>((ref, userId) {
   return ref.watch(chatServiceProvider).streamUserData(userId);
 });
+
+// ── Stream typing status for a given conversation ───────────────
+final typingStatusProvider =
+    StreamProvider.family<bool, String>((ref, otherUserId) {
+  return ref.watch(chatServiceProvider).streamTypingStatus(otherUserId);
+});

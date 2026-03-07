@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/models/message_model.dart';
 
@@ -61,14 +62,43 @@ class ChatBubble extends StatelessWidget {
               isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              message.text,
-              style: TextStyle(
-                fontSize: 15,
-                color: isDark ? AppColors.cream : AppColors.darkBrown,
-                height: 1.3,
+            if (message.type == MessageType.image)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CachedNetworkImage(
+                  imageUrl: message.text,
+                  width: 220,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    width: 220,
+                    height: 160,
+                    color: isDark
+                        ? AppColors.darkSurface
+                        : AppColors.cream,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.mediumBrown),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    width: 220,
+                    height: 160,
+                    color: isDark
+                        ? AppColors.darkSurface
+                        : AppColors.cream,
+                    child: const Icon(Icons.broken_image_rounded, size: 40),
+                  ),
+                ),
+              )
+            else
+              Text(
+                message.text,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: isDark ? AppColors.cream : AppColors.darkBrown,
+                  height: 1.3,
+                ),
               ),
-            ),
             const SizedBox(height: 4),
             Row(
               mainAxisSize: MainAxisSize.min,

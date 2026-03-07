@@ -99,7 +99,23 @@ class WelcomeScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 16),
+
+            // ── Login link for returning users ────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: TextButton(
+                onPressed: () => context.go('/login'),
+                child: Text(
+                  'Already have an account? Log in',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? AppColors.warmGray : AppColors.mediumBrown,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
           ],
         ),
       ),

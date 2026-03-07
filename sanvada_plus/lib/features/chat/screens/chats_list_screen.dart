@@ -21,7 +21,7 @@ class ChatsListScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.camera_alt_outlined),
             onPressed: () => context.push('/camera'),
-            tooltip: 'Camera',
+            tooltip: 'Sign Language Camera',
           ),
           IconButton(
             icon: const Icon(Icons.search_rounded),
@@ -104,77 +104,95 @@ class ChatsListScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final contact = contacts[index];
 
-              return ListTile(
-                onTap: () => context.push('/chat/${contact.contactId}'),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                leading: CircleAvatar(
-                  radius: 26,
-                  backgroundColor:
-                      isDark ? AppColors.darkAppBar : AppColors.cream,
-                  backgroundImage: contact.profilePic.isNotEmpty
-                      ? CachedNetworkImageProvider(contact.profilePic)
-                      : null,
-                  child: contact.profilePic.isEmpty
-                      ? Icon(
-                          Icons.person_rounded,
-                          color:
-                              isDark ? AppColors.warmGray : AppColors.tan,
-                          size: 28,
-                        )
-                      : null,
-                ),
-                title: Text(
-                  contact.name,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  contact.lastMessage,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isDark ? AppColors.warmGray : AppColors.tan,
-                    fontSize: 14,
-                  ),
-                ),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      formatChatTime(contact.timeSent),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: contact.unreadCount > 0
-                            ? AppColors.mediumBrown
-                            : (isDark ? AppColors.warmGray : AppColors.tan),
-                        fontWeight: contact.unreadCount > 0
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                      ),
+              return Consumer(
+                builder: (context, ref, _) {
+                  final isTyping = ref
+                          .watch(typingStatusProvider(contact.contactId))
+                          .valueOrNull ??
+                      false;
+
+                  return ListTile(
+                    onTap: () => context.push('/chat/${contact.contactId}'),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    leading: CircleAvatar(
+                      radius: 26,
+                      backgroundColor:
+                          isDark ? AppColors.darkAppBar : AppColors.cream,
+                      backgroundImage: contact.profilePic.isNotEmpty
+                          ? CachedNetworkImageProvider(contact.profilePic)
+                          : null,
+                      child: contact.profilePic.isEmpty
+                          ? Icon(
+                              Icons.person_rounded,
+                              color:
+                                  isDark ? AppColors.warmGray : AppColors.tan,
+                              size: 28,
+                            )
+                          : null,
                     ),
-                    const SizedBox(height: 6),
-                    if (contact.unreadCount > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.mediumBrown,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          contact.unreadCount > 99
-                              ? '99+'
-                              : '${contact.unreadCount}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                    title: Text(
+                      contact.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: isTyping
+                        ? Text(
+                            'typing...',
+                            style: TextStyle(
+                              color: AppColors.online,
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          )
+                        : Text(
+                            contact.lastMessage,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isDark ? AppColors.warmGray : AppColors.tan,
+                              fontSize: 14,
+                            ),
+                          ),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          formatChatTime(contact.timeSent),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: contact.unreadCount > 0
+                                ? AppColors.mediumBrown
+                                : (isDark ? AppColors.warmGray : AppColors.tan),
+                            fontWeight: contact.unreadCount > 0
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                           ),
                         ),
-                      ),
-                  ],
-                ),
+                        const SizedBox(height: 6),
+                        if (contact.unreadCount > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.mediumBrown,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              contact.unreadCount > 99
+                                  ? '99+'
+                                  : '${contact.unreadCount}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
               );
             },
           );

@@ -58,6 +58,21 @@ class _OTPScreenState extends ConsumerState<OTPScreen> {
     _profileSaved = true;
 
     try {
+      // Check if user already has a profile (returning user)
+      final profileExists =
+          await ref.read(authControllerProvider).userProfileExists();
+
+      if (profileExists) {
+        // Returning user – just set online status, keep existing data & chats
+        await ref.read(authServiceProvider).setOnlineStatus(true);
+        if (mounted) {
+          showSnackBar(context, 'Welcome back to Sanvadha+!');
+          context.go('/chats');
+        }
+        return;
+      }
+
+      // New user – save profile
       await ref.read(authControllerProvider).saveUserProfile(
             name: widget.registrationData['name'] as String? ?? '',
             about: widget.registrationData['about'] as String? ?? '',
