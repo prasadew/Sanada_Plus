@@ -104,6 +104,19 @@ class PhoneVerificationNotifier extends StateNotifier<PhoneVerificationState> {
         }
         if (!completer.isCompleted) completer.complete();
       },
+      onAutoRetrievalTimeout: (verificationId) {
+        debugPrint('🔵 [PROVIDER] onAutoRetrievalTimeout received');
+        if (verificationId.isNotEmpty && state.verificationId.isEmpty) {
+          state = state.copyWith(
+            verificationId: verificationId,
+            isLoading: false,
+            codeSent: true,
+          );
+        } else {
+          state = state.copyWith(isLoading: false);
+        }
+        if (!completer.isCompleted) completer.complete();
+      },
       onError: (error) {
         debugPrint('🔵 [PROVIDER] onError: $error');
         state = state.copyWith(isLoading: false, error: error);
@@ -112,8 +125,25 @@ class PhoneVerificationNotifier extends StateNotifier<PhoneVerificationState> {
     );
 
     debugPrint('🔵 [PROVIDER] Waiting for callback...');
-    // Wait until one of the callbacks fires
-    return completer.future;
+    try {
+      await completer.future.timeout(
+        const Duration(seconds: 120),
+        onTimeout: () {
+          if (!completer.isCompleted) completer.complete();
+          if (state.isLoading) {
+            state = state.copyWith(
+              isLoading: false,
+              error: 'OTP request timed out. Please try again.',
+            );
+          }
+        },
+      );
+    } on TimeoutException {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'OTP request timed out. Please try again.',
+      );
+    }
   }
 
   Future<bool> verifyOTP(String otp) async {

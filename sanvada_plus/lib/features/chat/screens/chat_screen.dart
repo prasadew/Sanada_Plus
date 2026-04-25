@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/utils.dart';
+import '../../camera/screens/sign_language_screen.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/chat_bubble.dart';
 
@@ -140,6 +141,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               const SizedBox(height: 16),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _openSignLanguageComposer() {
+    final otherUser = ref.read(userDataProvider(widget.chatId));
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SignLanguageScreen(
+          finalText: '',
+          onSendText: (message) {
+            final text = message.trim();
+            if (text.isEmpty) return;
+
+            otherUser.whenData((user) {
+              ref.read(chatServiceProvider).sendTextMessage(
+                    receiverId: widget.chatId,
+                    receiverName: user.name,
+                    receiverProfilePic: user.profilePic,
+                    text: text,
+                  );
+            });
+
+            _scrollToBottom();
+          },
         ),
       ),
     );
@@ -408,8 +436,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   if (_msgController.text.isNotEmpty) {
                     _sendMessage();
                   } else {
-                    // Open sign language detection camera
-                    context.push('/camera');
+                    _openSignLanguageComposer();
                   }
                 },
               ),

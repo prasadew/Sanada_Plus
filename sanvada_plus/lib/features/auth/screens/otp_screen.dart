@@ -97,6 +97,16 @@ class _OTPScreenState extends ConsumerState<OTPScreen> {
   }
 
   Future<void> _verifyOTP() async {
+    final verificationState = ref.read(phoneVerificationProvider);
+    if (verificationState.verificationId.isEmpty) {
+      showSnackBar(
+        context,
+        'Still requesting OTP. Please wait a moment and try again.',
+        isError: true,
+      );
+      return;
+    }
+
     final otp = _getOTP();
     if (otp.length < 6) {
       showSnackBar(context, 'Please enter the 6-digit OTP', isError: true);
@@ -159,7 +169,7 @@ class _OTPScreenState extends ConsumerState<OTPScreen> {
                     ? AppColors.darkAppBar
                     : AppColors.cream,
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.mark_email_read_rounded,
                 size: 48,
                 color: AppColors.mediumBrown,

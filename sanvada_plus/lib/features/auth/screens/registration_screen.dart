@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -237,39 +238,61 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   void _continue() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final phone = _phoneController.text.trim();
-    final fullPhone = '${_selectedCountry.dialCode}$phone';
+    final rawPhone = _phoneController.text.trim();
+    final localDigitsOnly = rawPhone.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (localDigitsOnly.isEmpty) {
+      showSnackBar(context, 'Please enter a valid phone number', isError: true);
+      return;
+    }
+
+    var localForInternational = localDigitsOnly;
+    if (localForInternational.startsWith('0')) {
+      localForInternational = localForInternational.substring(1);
+    }
+
+    final fullPhone = '${_selectedCountry.dialCode}$localForInternational';
+    final isLikelyE164 = RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(fullPhone);
+    if (!isLikelyE164) {
+      showSnackBar(
+        context,
+        'Invalid phone format. Please check country code and number.',
+        isError: true,
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
     // Reset any previous state
-    ref.read(phoneVerificationProvider.notifier).reset();
+    final notifier = ref.read(phoneVerificationProvider.notifier);
+    notifier.reset();
 
-    // Send OTP and wait for the result
-    await ref.read(phoneVerificationProvider.notifier).sendOTP(fullPhone);
+    try {
+      // Start OTP request and continue to OTP screen immediately.
+      // Firebase phone callbacks can be delayed on some devices/networks.
+      unawaited(notifier.sendOTP(fullPhone));
 
-    // Check the state after sendOTP completes
-    if (!mounted) return;
+      if (!mounted) return;
 
-    final state = ref.read(phoneVerificationProvider);
-
-    if (state.error != null) {
-      setState(() => _isLoading = false);
-      showSnackBar(context, state.error!, isError: true);
-      return;
+      // Navigate to OTP screen with registration data
+      context.push('/otp', extra: {
+        'phoneNumber': fullPhone,
+        'name': _nameController.text.trim(),
+        'about': _aboutController.text.trim(),
+        'countryCode': _selectedCountry.dialCode,
+        'localPhone': localDigitsOnly,
+        'profileImage': _profileImage,
+      });
+    } catch (e) {
+      if (mounted) {
+        showSnackBar(context, 'Failed to send OTP: $e', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
-
-    setState(() => _isLoading = false);
-
-    // Navigate to OTP screen with registration data
-    context.push('/otp', extra: {
-      'phoneNumber': fullPhone,
-      'name': _nameController.text.trim(),
-      'about': _aboutController.text.trim(),
-      'countryCode': _selectedCountry.dialCode,
-      'localPhone': phone,
-      'profileImage': _profileImage,
-    });
   }
 
   @override

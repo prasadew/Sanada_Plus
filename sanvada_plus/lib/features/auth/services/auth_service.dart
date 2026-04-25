@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import '../../../core/constants/firebase_constants.dart';
 import '../../../core/models/user_model.dart';
 
@@ -11,6 +10,8 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  static const bool _phoneAuthTestMode =
+      bool.fromEnvironment('PHONE_AUTH_TEST_MODE', defaultValue: false);
 
   User? get currentUser => _auth.currentUser;
   String? get uid => _auth.currentUser?.uid;
@@ -23,6 +24,7 @@ class AuthService {
     required String phoneNumber,
     required Function(String verificationId, int? resendToken) onCodeSent,
     required Function(PhoneAuthCredential credential) onAutoVerify,
+    required Function(String verificationId) onAutoRetrievalTimeout,
     required Function(String error) onError,
     int? resendToken,
   }) async {
@@ -51,12 +53,19 @@ class AuthService {
           } else if (e.code == 'captcha-check-failed') {
             onError('reCAPTCHA verification failed. Please try again.');
           } else {
-            onError(e.message ?? 'Verification failed');
+            onError('Firebase web auth failed: ${e.code} - ${e.message ?? 'Verification failed'}');
           }
         }
       } else {
+        if (kDebugMode && _phoneAuthTestMode) {
+          await _auth.setSettings(appVerificationDisabledForTesting: true);
+          debugPrint(
+            '⚠️ [AUTH] PHONE_AUTH_TEST_MODE enabled: app verification disabled for testing.',
+          );
+        }
+
         // On mobile, use the standard verifyPhoneNumber flow
-        await _auth.verifyPhoneNumber(
+        _auth.verifyPhoneNumber(
           phoneNumber: phoneNumber,
           forceResendingToken: resendToken,
           verificationCompleted: (PhoneAuthCredential credential) {
@@ -65,7 +74,18 @@ class AuthService {
           },
           verificationFailed: (FirebaseAuthException e) {
             debugPrint('❌ [AUTH] Verification FAILED: ${e.code} - ${e.message}');
-            onError(e.message ?? 'Verification failed');
+            final rawMessage = e.message ?? 'Verification failed';
+            final normalized = rawMessage.toLowerCase();
+            if (normalized.contains('missing initial state') ||
+                normalized.contains('error code:39')) {
+              onError(
+                'Firebase phone auth failed: ${e.code} - $rawMessage. '
+                'This usually means Android app verification is not configured correctly '
+                '(SHA fingerprints / Play Integrity / browser session state).',
+              );
+              return;
+            }
+            onError('Firebase phone auth failed: ${e.code} - $rawMessage');
           },
           codeSent: (String verificationId, int? resendToken) {
             debugPrint('📨 [AUTH] Code SENT! VerificationId: $verificationId');
@@ -73,6 +93,7 @@ class AuthService {
           },
           codeAutoRetrievalTimeout: (String verificationId) {
             debugPrint('⏰ [AUTH] Auto-retrieval TIMEOUT');
+            onAutoRetrievalTimeout(verificationId);
           },
           timeout: const Duration(seconds: 60),
         );
